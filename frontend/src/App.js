@@ -84,9 +84,11 @@ function App() {
             <option key={page.id} value={page.id}>{page.name}</option>
           ))}
         </select>
-        <button onClick={handleFetchConversations} style={{ marginTop: "10px" }}>
-          📥 ขุด
-        </button>
+        
+        <a href="#" class="title" style={{marginLeft:"45px"}}>ตั้งค่าระบบขุด</a><br />
+        <a href="#" class="title" style={{marginLeft:"47px"}}>Dashboard</a><br />
+        <a href="#" class="title" style={{marginLeft:"59px"}}>Setting</a><br />
+      
       </aside>
 
       {/* Main Dashboard */}
@@ -123,8 +125,8 @@ function App() {
                 <th style={{ border: "1px solid #ccc", padding: "8px" }}>Platform</th>
                 <th style={{ border: "1px solid #ccc", padding: "8px" }}>หมวดหมู่ลูกค้า</th>
                 <th style={{ border: "1px solid #ccc", padding: "8px" }}>สถานะการขุด</th>
-                 <th style={{ border: "1px solid #ccc", padding: "8px" }}>PSID</th>
-                  <th style={{ border: "1px solid #ccc", padding: "8px" }}>เลือก</th>
+                
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>เลือก</th>
 
                 
               </tr>
@@ -167,19 +169,21 @@ function App() {
                   <td style={{ border: "1px solid #ccc", padding: "8px" }}>    {/* สถานะการขุด */}
                     สถานะการขุด
                   </td>
-                  
-                  <td style={{ border: "1px solid #ccc", padding: "8px" }}>    {/* PSID */}
-                    {conv.sender_name}  
-                  </td>
-
+                 
                   <td style={{ border: "1px solid #ccc", padding: "8px" }}>    {/* เลือก */}
                     <input type="checkbox" />
                   </td>
                 </tr>
+                
               ))}
             </tbody>
+            
           </table>
+          
         )}
+        <button onClick={handleFetchConversations} style={{ marginTop: "10px" }}>
+          📥 ขุด
+        </button>
       </main>
     </div>
   );
