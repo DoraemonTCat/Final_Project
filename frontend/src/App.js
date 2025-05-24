@@ -103,12 +103,11 @@ function App() {
         <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
           <input type="date" />
           <select><option>หมวดหมู่ลูกค้า</option></select>
-          
           <select><option>Platform</option></select>
           <select><option>สินค้า</option></select>
           <select><option>ประเภท</option></select>
           <select><option>สถานะการขุด</option></select>
-          <input input type="number" placeholder="ระยะเวลา" min="0"/>
+          <input type="time" placeholder="ระบุเวลา" />
           <button>🔍 ค้นหา</button>
           
 
