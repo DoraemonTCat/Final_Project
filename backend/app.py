@@ -20,6 +20,7 @@ PAGE_ID = "126914607172289"
 FB_API_URL = "https://graph.facebook.com/v14.0"
 
 page_tokens = {}  # key = page_id, value = PAGE_ACCESS_TOKEN
+page_names = {}   # key = page_id, value = page_name
 
 app.add_middleware(
     CORSMiddleware,
@@ -253,14 +254,16 @@ def facebook_callback(code: str):
     for page in pages.get("data", []):
         page_id = page["id"]
         access_token = page["access_token"]
+        page_name = page.get("name", f"เพจ {page_id}")
         page_tokens[page_id] = access_token
+        page_names[page_id] = page_name
 
     # 🔁 จากนั้น redirect กลับ React พร้อมส่งข้อมูลที่จำเป็น (ถ้าต้องการ)
     return RedirectResponse(url=f"http://localhost:3000/?page_id={page_id}")
 
 @app.get("/pages")
 async def get_connected_pages():
-    return {"pages": [{"id": k, "name": f"เพจ {k}"} for k in page_tokens.keys()]}
+    return {"pages": [{"id": k, "name": page_names.get(k, f"เพจ {k}")} for k in page_tokens.keys()]}
 
 # ================================
 # 📩 ดึงข้อความใน conversation

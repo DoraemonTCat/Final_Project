@@ -71,23 +71,27 @@ function App() {
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#222" }}>
       {/* Sidebar */}
       <aside style={{ width: "200px", backgroundColor: "#ccc", padding: "20px" }}>
-        <h3>ชื่อเพจ</h3>
-        <button onClick={connectFacebook}>🔗 เชื่อมต่อ Facebook</button>
+        <h3 style={{marginLeft:"35px"}}>ช่องทางเชื่อมต่อ</h3>
+        <button onClick={connectFacebook} class = "BT">
+          <svg width="20" height="20" viewBox="0 0 320 512" fill="#fff" style={{ background: "#1877f3", borderRadius: "3px" }}>
+            <path d="M279.14 288l14.22-92.66h-88.91V127.91c0-25.35 12.42-50.06 52.24-50.06H293V6.26S259.5 0 225.36 0c-73.22 0-121 44.38-121 124.72v70.62H22.89V288h81.47v224h100.2V288z"/>
+          </svg>
+        </button>
         <hr />
         <select
           value={selectedPage}
           onChange={(e) => setSelectedPage(e.target.value)}
           style={{ width: "100%", padding: "8px", marginTop: "10px" }}
         >
-          <option value="">-- เลือกเพจ --</option>
+          <option value="" style={{textAlign:"center"}}>-- เลือกเพจ --</option>
           {pages.map(page => (
-            <option key={page.id} value={page.id}>{page.name}</option>
+            <option style={{textAlign:"center"}} key={page.id} value={page.id}>{page.name} </option>
           ))}
         </select>
         
-        <a href="#" class="title" style={{marginLeft:"45px"}}>ตั้งค่าระบบขุด</a><br />
-        <a href="#" class="title" style={{marginLeft:"47px"}}>Dashboard</a><br />
-        <a href="#" class="title" style={{marginLeft:"59px"}}>Setting</a><br />
+        <a href="#" class="title" style={{marginLeft:"50px"}}>ตั้งค่าระบบขุด</a><br />
+        <a href="#" class="title" style={{marginLeft:"53px"}}>Dashboard</a><br />
+        <a href="#" class="title" style={{marginLeft:"64px"}}>Setting</a><br />
       
       </aside>
 
@@ -99,6 +103,7 @@ function App() {
         <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
           <input type="date" />
           <select><option>หมวดหมู่ลูกค้า</option></select>
+          
           <select><option>Platform</option></select>
           <select><option>สินค้า</option></select>
           <select><option>ประเภท</option></select>
