@@ -1,211 +1,186 @@
 import { useState, useEffect } from "react";
 import './App.css';
-import { fetchPages, sendMessage, connectFacebook } from "./Features/Tool";
+import { fetchPages, connectFacebook } from "./Features/Tool";
 import axios from "axios";
 
 function App() {
   const [pages, setPages] = useState([]);
   const [selectedPage, setSelectedPage] = useState("");
-  const [conversationId, setConversationId] = useState("");
-  const [messages, setMessages] = useState([]);
+  const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [newMessage, setNewMessage] = useState("");
 
-  // ดึง page_id จาก URL ถ้ามี (หลัง redirect จาก Facebook)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const pageIdFromUrl = params.get("page_id");
-    if (pageIdFromUrl) setSelectedPage(pageIdFromUrl);
-  }, []);
-
-  // ดึงรายชื่อเพจหลังจากผู้ใช้เชื่อมต่อ Facebook แล้ว
   useEffect(() => {
     fetchPages()
       .then(setPages)
       .catch(err => console.error("ไม่สามารถโหลดเพจได้:", err));
   }, []);
 
-  // ✅ ดึงข้อความและ log โครงสร้างข้อมูล
-  const handleFetchMessages = () => {
-    if (!selectedPage || !conversationId) {
-      alert("กรุณาเลือกเพจและใส่ Conversation ID ให้ครบ");
+  // ฟังก์ชันแปลงเวลาห่าง
+  function timeAgo(dateString) {
+    if (!dateString) return "-";
+    const past = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - past.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 0) return "0 วินาทีที่แล้ว";
+    if (diffSec < 60) return `${diffSec} วินาทีที่แล้ว`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin} นาทีที่แล้ว`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr} ชั่วโมงที่แล้ว`;
+    const diffDay = Math.floor(diffHr / 24);
+    return `${diffDay} วันที่แล้ว`;
+  }
+
+  const handleFetchConversations = () => {
+    if (!selectedPage) {
+      alert("กรุณาเลือกเพจ");
       return;
     }
     setLoading(true);
-    axios.get(`http://localhost:8000/messages/${selectedPage}/${conversationId}`)
+    axios.get(`http://localhost:8000/psids?page_id=${selectedPage}`)
       .then(res => {
-        const fetchedMessages = res.data.data || [];
-        console.log("📦 ข้อความที่ได้:", fetchedMessages); // 👈 ดูโครงสร้างจริง
-        setMessages(fetchedMessages);
+        const allConvs = res.data.conversations || [];
+        const mapped = allConvs.map((conv, idx) => {
+          const userName = conv.names && conv.names[0]
+            ? conv.names[0]
+            : (conv.participants && conv.participants[0]?.name)
+              ? conv.participants[0].name
+              : 'ไม่ทราบชื่อ';
+          return {
+            id: idx + 1,
+            updated_time: conv.updated_time,
+            created_time: conv.created_time, // เพิ่มตรงนี้
+            sender_name: conv.psids[0] || "Unknown",
+            conversation_id: conv.conversation_id,
+            conversation_name: ` ${userName}`,
+            user_name: userName,
+            raw_psid: conv.psids[0]
+          };
+        });
+        setConversations(mapped);
       })
       .catch(err => {
-        console.error("เกิดข้อผิดพลาดในการดึงข้อความ:", err);
-        alert("เกิดข้อผิดพลาดในการดึงข้อความ");
+        alert("เกิดข้อผิดพลาด");
+        console.error(err);
       })
       .finally(() => setLoading(false));
   };
 
-  const handleSendMessage = () => {
-    if (!selectedPage || !conversationId || !newMessage) {
-      alert("กรุณาเลือกเพจ ระบุ Conversation ID และกรอกข้อความ");
-      return;
-    }
-    sendMessage(selectedPage, conversationId, newMessage)
-      .then(() => {
-        alert("✅ ส่งข้อความแล้ว");
-        setNewMessage("");
-        handleFetchMessages();
-      })
-      .catch(err => {
-        alert(err.message || "ส่งข้อความไม่สำเร็จ");
-        console.error(err);
-      });
-  };
-
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>📬 ดึงข้อความจาก Facebook Page</h1>
-
-        {/* ✅ ปุ่มเชื่อมต่อ Facebook */}
-        <button onClick={connectFacebook} style={{ padding: "10px 20px", marginBottom: "20px" }}>
-          🔗 เชื่อมต่อ Facebook
+    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#222" }}>
+      {/* Sidebar */}
+      <aside style={{ width: "200px", backgroundColor: "#ccc", padding: "20px" }}>
+        <h3>ชื่อเพจ</h3>
+        <button onClick={connectFacebook}>🔗 เชื่อมต่อ Facebook</button>
+        <hr />
+        <select
+          value={selectedPage}
+          onChange={(e) => setSelectedPage(e.target.value)}
+          style={{ width: "100%", padding: "8px", marginTop: "10px" }}
+        >
+          <option value="">-- เลือกเพจ --</option>
+          {pages.map(page => (
+            <option key={page.id} value={page.id}>{page.name}</option>
+          ))}
+        </select>
+        <button onClick={handleFetchConversations} style={{ marginTop: "10px" }}>
+          📥 ขุด
         </button>
+      </aside>
 
-        {/* ✅ Dropdown เลือกเพจ */}
-        <div style={{ marginBottom: "10px" }}>
-          <select
-            value={selectedPage}
-            onChange={(e) => setSelectedPage(e.target.value)}
-            style={{ padding: "8px", width: "300px" }}
-          >
-            <option value="">-- เลือกเพจของคุณ --</option>
-            {pages.map((page) => (
-              <option key={page.id} value={page.id}>
-                {page.name}
-              </option>
-            ))}
-          </select>
+      {/* Main Dashboard */}
+      <main style={{ flexGrow: 1, padding: "20px", backgroundColor: "#f0f0f0" }}>
+        <h2>📋 ตารางการขุด</h2>
+
+        {/* Filters Bar (mockup) */}
+        <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+          <input type="date" />
+          <select><option>หมวดหมู่ลูกค้า</option></select>
+          <select><option>Platform</option></select>
+          <select><option>สินค้า</option></select>
+          <select><option>ประเภท</option></select>
+          <select><option>สถานะการขุด</option></select>
+          <input input type="number" placeholder="ระยะเวลา" min="0"/>
+          <button>🔍 ค้นหา</button>
+          
+
         </div>
 
-        {/* ✅ Input สำหรับ Conversation ID */}
-        <div style={{ marginBottom: "20px" }}>
-          <input
-            type="text"
-            placeholder="ใส่ Conversation ID"
-            value={conversationId}
-            onChange={(e) => setConversationId(e.target.value)}
-            style={{ padding: "8px", width: "300px" }}
-          />
-          <br />
-          <button onClick={handleFetchMessages} style={{ marginTop: "10px", padding: "10px 20px" }}>
-            📩 ดึงข้อความ
-          </button>
-        </div>
-         <div style={{ marginTop: "20px" }}>
-          <input
-            type="text"
-            placeholder="พิมพ์ข้อความที่ต้องการส่ง"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            style={{ padding: "8px", width: "300px" }}
-          />
-          <br />
-          <button
-            onClick={handleSendMessage}
-            style={{ marginTop: "10px", padding: "10px 20px" }}
-          >
-            🚀 ส่งข้อความ
-          </button>
-        </div>
-    
-  
-        
-
-        {/* ✅ แสดงข้อความ */}
+        {/* Table */}
         {loading ? (
-          <p>กำลังโหลด...</p>
-        ) : messages.length === 0 ? (
-          <p>ยังไม่มีข้อความ</p>
+          <p>⏳ กำลังโหลด...</p>
         ) : (
-          <ul>
-            {messages.map((msg, index) => (
-              <li key={index} style={{ marginBottom: "20px" }}>
-                {/* ✅ แสดงข้อความ ถ้ามี */}
-                {msg.message && <p>{msg.message}</p>}
+          <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff" }}>
+            <thead>
+              <tr>
+                <th style={{ border: "1px solid #ccc", padding: "8px"}}>ลำดับ</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>ชื่อผู้ใช้</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>วันที่เข้ามา</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>ระยะเวลาที่หาย</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>Context</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>สินค้าที่สนใจ</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>Platform</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>หมวดหมู่ลูกค้า</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px" }}>สถานะการขุด</th>
+                 <th style={{ border: "1px solid #ccc", padding: "8px" }}>PSID</th>
+                  <th style={{ border: "1px solid #ccc", padding: "8px" }}>เลือก</th>
 
-                {/* ✅ ถ้าไม่มีข้อความเลยแต่ไม่มีไฟล์แนบ */}
-                {!msg.message && (!msg.attachments || msg.attachments.data.length === 0) && (
-                  <p>[ไม่มีข้อความ]</p>
-                )}
+                
+              </tr>
+            </thead>
+            <tbody> 
+              {conversations.map((conv, idx) => (
+                <tr key={conv.conversation_id}>
+                  <td style={{ border: "1px solid #ccc", padding: "8px" , textAlign: "center"}}>     {/* ลำดับ */}
+                    {idx + 1}
+                  </td>
+                  
+                  <td style={{ border: "1px solid #ccc", padding: "8px" }}>    {/* ชื่อผู้ใช้ */}
+                    {conv.conversation_name || `บทสนทนาที่ ${idx + 1}`}
+                  </td>
+                  
+                  <td style={{ border: "1px solid #ccc", padding: "8px" }}>   {/* วันที่เข้ามา */}
+                    {conv.created_time? new Date(conv.created_time).toLocaleDateString("th-TH", { year: 'numeric', month: 'short', day: 'numeric' }): "-"}
+                  </td> 
+                  
+                  <td style={{ border: "1px solid #ccc", padding: "8px" }}>    {/* ระยะเวลาที่หาย */}
+                    {timeAgo(conv.updated_time)}
+                  </td> 
+                  
+                  <td style={{ border: "1px solid #ccc", padding: "8px" }}>    {/* Context */}
+                    Context
+                  </td>
+                  
+                  <td style={{ border: "1px solid #ccc", padding: "8px" }}>    {/* สินค้าที่สนใจ */}
+                    สินค้าที่สนใจ
+                  </td>
+                  
+                  <td style={{ border: "1px solid #ccc", padding: "8px" }}>    {/* Platform */}
+                    Platform
+                  </td>
+                  
+                  <td style={{ border: "1px solid #ccc", padding: "8px" }}>    {/* หมวดหมู่ลูกค้า */}
+                    หมวดหมู่ลูกค้า
+                  </td>
+                  
+                  <td style={{ border: "1px solid #ccc", padding: "8px" }}>    {/* สถานะการขุด */}
+                    สถานะการขุด
+                  </td>
+                  
+                  <td style={{ border: "1px solid #ccc", padding: "8px" }}>    {/* PSID */}
+                    {conv.sender_name}  
+                  </td>
 
-                {/* ✅ แสดงไฟล์แนบ */}
-                {msg.attachments?.data.map((attachment, i) => {
-                  const type = attachment.type;
-                  const payload = attachment.payload;
-                  // รองรับทั้ง payload.url และ image_data.url
-                  const url = payload?.url || attachment.image_data?.url || attachment.image_data?.preview_url;
-
-                  if (!url) {
-                    console.log("🚨 attachment ไม่มี url:", attachment);
-                  }
-
-                  if (type === "image" && url) {
-                    return (
-                      <div key={i} style={{ marginTop: "10px" }}>
-                        <img
-                          src={url}
-                          alt="รูปแนบ"
-                          style={{ maxWidth: "200px", marginTop: "10px" }}
-                        />
-                        <div>
-                          <a href={url} target="_blank" rel="noopener noreferrer">
-                            🔗 เปิดรูปภาพขนาดเต็ม
-                          </a>
-                        </div>
-                      </div>
-                    );
-                  } else if (type === "video" && url) {
-                    return (
-                      <video key={i} controls style={{ maxWidth: "300px", marginTop: "10px" }}>
-                        <source src={url} type="video/mp4" />
-                        วิดีโอไม่รองรับ
-                      </video>
-                    );
-                  } else if (url) {
-                    return (
-                      <div key={i} style={{ marginTop: "10px" }}>
-                        🔗 <a href={url} target="_blank" rel="noopener noreferrer">เปิดลิงก์</a>
-                      </div>
-                    );
-                  } else if (attachment.file_url) {
-                    return (
-                      <div key={i}>
-                        <a
-                          href={attachment.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          📎 {decodeURIComponent(attachment.file_url.split("/").pop().split("?")[0])}
-                        </a>
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <div key={i}>
-                        [ไม่สามารถแสดงไฟล์แนบ]<br />
-                        <pre>{JSON.stringify(attachment, null, 2)}</pre>
-                      </div>
-                    );
-                  }
-                })}
-              </li>
-            ))}
-          </ul>
+                  <td style={{ border: "1px solid #ccc", padding: "8px" }}>    {/* เลือก */}
+                    <input type="checkbox" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
-
-       
-      </header>
+      </main>
     </div>
   );
 }

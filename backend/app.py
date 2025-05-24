@@ -11,7 +11,7 @@ app = FastAPI()
 # ================================
 FB_APP_ID = "1684291582292889"
 FB_APP_SECRET = "1572143aaef1398d8f50188ff0d2c07e"
-REDIRECT_URI = "https://frequently-reviewing-writing-pens.trycloudflare.com/facebook/callback"
+REDIRECT_URI = "https://torture-blues-listings-twisted.trycloudflare.com/facebook/callback"
 OAUTH_LINK = f"https://www.facebook.com/v14.0/dialog/oauth?client_id={FB_APP_ID}&redirect_uri={REDIRECT_URI}&scope=pages_show_list,pages_read_engagement,pages_messaging&response_type=code"
 
 PAGE_ACCESS_TOKEN = "EAAX72rF185kBO5MkoMeUI5dZC4ToZAfJ4Y7iEEreohrhXdsY1yAoa5xy43BQBfkJWokJ6JuvVvy1If6feZCCQ8ZBWQzf4f7ivx9OGIhbfyunZB7ZCiJD8uSZC4wgwwpKTUGgIK55o3XelkfBZCyKYiO5Aco0nzQPgbHrZBo2nrTBEuoMKI5R4OHa0ScANRBwcL9IIwBBs4ArpI2xAQWo9M4UZD"
@@ -130,18 +130,39 @@ async def webhook_post(request: Request):
 
 def get_conversations_with_participants(page_id, access_token: str = None):
     url = f"{FB_API_URL}/{page_id}/conversations"
-    params = {"fields": "participants"}
+    params = {"fields": "participants,updated_time"}
     return fb_get(url.replace(f"{FB_API_URL}/", ""), params, access_token)
 
-def extract_psids_with_conversation_id(conversations_data):
+def get_user_name(psid, access_token):
+    url = f"https://graph.facebook.com/{psid}"
+    params = {"fields": "name", "access_token": access_token}
+    res = requests.get(url, params=params)
+    if res.status_code == 200:
+        return res.json().get("name", "")
+    return ""
+
+def extract_psids_with_conversation_id(conversations_data, access_token):
     result = []
     for convo in conversations_data.get("data", []):
         convo_id = convo.get("id")
         participants = convo.get("participants", {}).get("data", [])
-        psids = [p.get("id") for p in participants if p.get("id") and p.get("id") != PAGE_ID]
+        updated_time = convo.get("updated_time")
+        # ดึงเวลาข้อความแรก
+        created_time = get_first_message_time(convo_id, access_token)
+
+        psids = []
+        names = []
+        for p in participants:
+            if p.get("id") and p.get("id") != PAGE_ID:
+                psids.append(p.get("id"))
+                names.append(p.get("name", "ไม่ทราบชื่อ"))
+        
         result.append({
             "conversation_id": convo_id,
-            "psids": psids
+            "psids": psids,
+            "names": names,
+            "updated_time": updated_time,
+            "created_time": created_time  # เพิ่มตรงนี้
         })
     return result
 
@@ -159,10 +180,11 @@ async def test_send(user_id: str):
     return {"message": "ส่งข้อความ 1234 แล้ว", "result": result}
 
 @app.get("/psids")
-async def get_user_psids():
-    conversations = get_conversations_with_participants(PAGE_ID)
+async def get_user_psids(page_id: str):
+    access_token = page_tokens.get(page_id)
+    conversations = get_conversations_with_participants(page_id, access_token)
     if conversations:
-        data = extract_psids_with_conversation_id(conversations)
+        data = extract_psids_with_conversation_id(conversations, access_token)
         return JSONResponse(content={"conversations": data})
     return JSONResponse(status_code=500, content={"error": "ไม่สามารถดึงข้อมูล conversation ได้"})
 
@@ -278,6 +300,19 @@ async def send_user_message(page_id: str, psid: str, req: SendMessageRequest):
     result = send_message(psid, req.message, access_token)
     return {"result": result}
 
+def get_first_message_time(conversation_id, access_token):
+    url = f"{FB_API_URL}/{conversation_id}/messages"
+    params = {
+        "access_token": access_token,
+        "fields": "created_time",
+        "limit": 1,
+        "sort": "chronological"  # ดึงข้อความแรกสุด
+    }
+    res = requests.get(url, params=params)
+    data = res.json()
+    if "data" in data and data["data"]:
+        return data["data"][0].get("created_time")
+    return None
 
 
 
