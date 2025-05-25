@@ -11,7 +11,7 @@ app = FastAPI()
 # ================================
 FB_APP_ID = "1684291582292889"
 FB_APP_SECRET = "1572143aaef1398d8f50188ff0d2c07e"
-REDIRECT_URI = "https://torture-blues-listings-twisted.trycloudflare.com/facebook/callback"
+REDIRECT_URI = "https://totals-online-seasonal-eyed.trycloudflare.com/facebook/callback"
 OAUTH_LINK = f"https://www.facebook.com/v14.0/dialog/oauth?client_id={FB_APP_ID}&redirect_uri={REDIRECT_URI}&scope=pages_show_list,pages_read_engagement,pages_messaging&response_type=code"
 
 PAGE_ACCESS_TOKEN = "EAAX72rF185kBO5MkoMeUI5dZC4ToZAfJ4Y7iEEreohrhXdsY1yAoa5xy43BQBfkJWokJ6JuvVvy1If6feZCCQ8ZBWQzf4f7ivx9OGIhbfyunZB7ZCiJD8uSZC4wgwwpKTUGgIK55o3XelkfBZCyKYiO5Aco0nzQPgbHrZBo2nrTBEuoMKI5R4OHa0ScANRBwcL9IIwBBs4ArpI2xAQWo9M4UZD"
@@ -295,7 +295,7 @@ class SendMessageRequest(BaseModel):
     message: str
 
 @app.post("/send/{page_id}/{psid}")
-async def send_user_message(page_id: str, psid: str, req: SendMessageRequest):
+async def send_user_message_by_psid(page_id: str, psid: str, req: SendMessageRequest):
     access_token = page_tokens.get(page_id)
     if not access_token:
         return {"error": "Page token not found. Please connect via /connect first."}

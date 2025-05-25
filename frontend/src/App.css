@@ -57,3 +57,26 @@
   margin-bottom: 16px;
  margin-left: 44%;
 }
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.filter-select, .filter-input {
+  min-width: 120px;
+  margin: 0;
+}
+.date-range-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.date-separator {
+  margin: 0 4px;
+}
+.table {
+  border: 1px solid #ccc;
+  padding: 8px;
+}
