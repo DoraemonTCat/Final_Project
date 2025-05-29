@@ -198,12 +198,12 @@ function App() {
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#222" }}>
+    <div className="app-container">
       {/* Sidebar */}
-      <aside style={{ width: "200px", backgroundColor: "#ccc", padding: "20px" }}>
-        <h3 style={{ marginLeft: "26px" }}>ช่องทางเชื่อมต่อ</h3>
+      <aside className="sidebar">
+        <h3 className="sidebar-title">ช่องทางเชื่อมต่อ</h3>
         <button onClick={connectFacebook} className="BT">
-          <svg width="20" height="20" viewBox="0 0 320 512" fill="#fff" style={{ background: "#1877f3", borderRadius: "3px" }}>
+          <svg width="20" height="20" viewBox="0 0 320 512" fill="#fff" className="fb-icon">
             <path d="M279.14 288l14.22-92.66h-88.91V127.91c0-25.35 12.42-50.06 52.24-50.06H293V6.26S259.5 0 225.36 0c-73.22 0-121 44.38-121 124.72v70.62H22.89V288h81.47v224h100.2V288z" />
           </svg>
         </button>
@@ -211,21 +211,22 @@ function App() {
         <select
           value={selectedPage}
           onChange={(e) => setSelectedPage(e.target.value)}
-          style={{ width: "100%", padding: "8px", marginTop: "10px" }}
+          className="select-page"
         >
-          <option value="" style={{ textAlign: "center" }}>-- เลือกเพจ --</option>
-          {pages.map(page => (
-            <option style={{ textAlign: "center" }} key={page.id} value={page.id}>{page.name} </option>
+          <option value="">-- เลือกเพจ --</option>
+          {pages.map((page) => (
+            <option key={page.id} value={page.id}>
+              {page.name}
+            </option>
           ))}
         </select>
-
-        <a href="#" className="title" style={{ marginLeft: "50px" }}>ตั้งค่าระบบขุด</a><br />
-        <a href="#" className="title" style={{ marginLeft: "53px" }}>Dashboard</a><br />
-        <a href="#" className="title" style={{ marginLeft: "64px" }}>Setting</a><br />
+        <a href="#" className="title" style={{marginLeft:"50px"}}>ตั้งค่าระบบขุด</a><br />
+        <a href="#" className="title" style={{marginLeft:"53px"}}>Dashboard</a><br />
+        <a href="#" className="title" style={{marginLeft:"66px"}}>Setting</a><br />
       </aside>
 
       {/* Main Dashboard */}
-      <main style={{ flexGrow: 1, padding: "20px", backgroundColor: "#f0f0f0" }}>
+      <main className="main-dashboard">
         <h2>📋 ตารางการขุด</h2>
         <button
           className="filter-toggle-button"
@@ -284,20 +285,20 @@ function App() {
               <option value="returnCM">มีการตอบกลับ</option>
             </select>
             <div className="date-range-group">
-              <span style={{ marginRight: 4 }}>วันที่เริ่มต้น</span>
               <input
                 type="date"
                 className="filter-input"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
+                placeholder="วันที่เริ่มต้น"
               />
-              <span className="date-separator" style={{ margin: "0 8px" }}>-</span>
-              <span style={{ marginRight: 4 }}>วันที่สิ้นสุด</span>
+              <span className="date-separator">-</span>
               <input
                 type="date"
                 className="filter-input"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
+                placeholder="วันที่สิ้นสุด"
               />
             </div>
             <button onClick={() => {
@@ -322,33 +323,33 @@ function App() {
           <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff" }}>
             <thead>
               <tr>
-                <th className="table">ลำดับ</th>
-                <th className="table">ชื่อผู้ใช้</th>
-                <th className="table">วันที่เข้ามา</th>
-                <th className="table">ระยะเวลาที่หาย</th>
-                <th className="table">Context</th>
-                <th className="table">สินค้าที่สนใจ</th>
-                <th className="table">Platform</th>
-                <th className="table">หมวดหมู่ลูกค้า</th>
-                <th className="table">สถานะการขุด</th>
-                <th className="table">เลือก</th>
+                <th class = "table">ลำดับ</th>
+                <th class = "table">ชื่อผู้ใช้</th>
+                <th class = "table">วันที่เข้ามา</th>
+                <th class = "table">ระยะเวลาที่หาย</th>
+                <th class = "table">Context</th>
+                <th class = "table">สินค้าที่สนใจ</th>
+                <th class = "table">Platform</th>
+                <th class = "table">หมวดหมู่ลูกค้า</th>
+                <th class = "table">สถานะการขุด</th>
+                <th class = "table">เลือก</th>
               </tr>
             </thead>
             <tbody>
               {displayData.map((conv, idx) => (
                 <tr key={conv.conversation_id || idx}>
-                  <td className="table" style={{ textAlign: "center" }}>{idx + 1}</td>
-                  <td className="table">{conv.conversation_name || `บทสนทนาที่ ${idx + 1}`}</td>
-                  <td className="table">
+                  <td style={{ border: "1px solid #ccc", padding: "8px", textAlign: "center" }}>{idx + 1}</td>
+                  <td class = "table">{conv.conversation_name || `บทสนทนาที่ ${idx + 1}`}</td>
+                  <td class = "table">
                     {conv.created_time ? new Date(conv.created_time).toLocaleDateString("th-TH", { year: 'numeric', month: 'short', day: 'numeric' }) : "-"}
                   </td>
-                  <td className="table">{timeAgo(conv.updated_time)}</td>
-                  <td className="table">Context</td>
-                  <td className="table">สินค้าที่สนใจ</td>
-                  <td className="table">Platform</td>
-                  <td className="table">หมวดหมู่ลูกค้า</td>
-                  <td className="table">สถานะการขุด</td>
-                  <td className="table">
+                  <td class = "table">{timeAgo(conv.updated_time)}</td>
+                  <td class = "table">Context</td>
+                  <td class = "table">สินค้าที่สนใจ</td>
+                  <td class = "table">Platform</td>
+                  <td class = "table">หมวดหมู่ลูกค้า</td>
+                  <td class = "table">สถานะการขุด</td>
+                  <td class = "table">
                     <input
                       type="checkbox"
                       checked={selectedConversationIds.includes(conv.conversation_id)}
@@ -360,7 +361,7 @@ function App() {
             </tbody>
           </table>
         )}
-        <button onClick={sendMessageToSelected} style={{ marginTop: "10px", marginLeft:"8px"}}>
+        <button onClick={sendMessageToSelected} style={{ marginTop: "10px" }}>
           📥 ขุด
         </button>
       </main>
