@@ -47,7 +47,7 @@ function SetMiner() {
         </div>
         <div className="setminer-main">
           <div className="setminer-card">
-              <Link to="#" className = "Box" >Default</Link>
+              <Link to="/Default" className = "Box" >Default</Link>
           </div>
           <div className="setminer-card">
               <Link to="#" className = "Box" >ตามกลุ่ม/ลูกค้า</Link>
