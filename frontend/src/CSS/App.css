@@ -225,3 +225,18 @@ body {
    border: 1px solid #ccc;
    padding: 8px;
 }
+.mine-button {
+  background-color: #4CAF50;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 20px;
+  font-size: 16px;
+}
+
+.mine-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}

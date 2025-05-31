@@ -4,6 +4,7 @@ import './index.css';
 import App from './AppMiner/App';
 import SetMiner from './AppMiner/Set_Miner';
 import Default from './AppMiner/Default';
+import Test from './AppMiner/Test';
 import reportWebVitals from './reportWebVitals';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
@@ -16,6 +17,9 @@ root.render(
         <Route path="/Set_Miner" element={<SetMiner />} />
         <Route path="/App" element={<App />} />
         <Route path="/Default" element={<Default />} />
+        <Route path="/Test" element={<Test />} />
+       
+        
         {/* Add more routes as needed */}
 
       </Routes>

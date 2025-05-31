@@ -21,8 +21,9 @@ function App() {
   const displayData = filteredConversations.length > 0 ? filteredConversations : conversations;
   const [pageId, setPageId] = useState("");
   const [selectedConversationIds, setSelectedConversationIds] = useState([]);
-  const [messageToSend, setMessageToSend] = useState("📢 อยากลบ***ออกจากสมอง แต่สิ่งที่หายไปคือสมองเหลือแต่***");
   
+  // 🔥 เอาบรรทัดนี้ออก เพราะจะดึงจาก localStorage แทน
+  // const [messageToSend, setMessageToSend] = useState("📢 อยากลบ***ออกจากสมอง แต่สิ่งที่หายไปคือสมองเหลือแต่***");
   
   useEffect(() => {
     fetchPages()
@@ -184,19 +185,61 @@ function App() {
     );
   };
 
-  // 📤 ฟังก์ชันกดปุ่ม "ขุด"
-  const sendMessageToSelected = async () => {
-    if (!messageToSend || selectedConversationIds.length === 0) return;
+  // 🔥 ฟังก์ชันดึงข้อความจาก localStorage
+  const getDefaultMessages = () => {
+    const savedMessages = localStorage.getItem('defaultMessages');
+    return savedMessages ? JSON.parse(savedMessages) : [];
+  };
 
-    for (const conversationId of selectedConversationIds) {
-      await fetch(`/send/${pageId}/${conversationId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageToSend }),
-      });
+  // 📤 ฟังก์ชันกดปุ่ม "ขุด" - ส่งข้อความทั้งหมดจาก Default.js
+  const sendMessageToSelected = async () => {
+    if (selectedConversationIds.length === 0) {
+      alert("กรุณาเลือกการสนทนาที่ต้องการส่งข้อความ");
+      return;
     }
 
-    alert("ส่งข้อความเรียบร้อยแล้ว!");
+    // 🔥 ดึงข้อความทั้งหมดจาก localStorage
+    const defaultMessages = getDefaultMessages();
+    
+    if (defaultMessages.length === 0) {
+      alert("ไม่มีข้อความที่บันทึกไว้ กรุณาไปตั้งค่าข้อความใน 'ตั้งค่าระบบขุด' ก่อน");
+      return;
+    }
+
+    try {
+      // วนลูปส่งข้อความไปยังแต่ละ conversation
+      for (const conversationId of selectedConversationIds) {
+        // หา PSID จาก conversation_id
+        const selectedConv = displayData.find(conv => conv.conversation_id === conversationId);
+        const psid = selectedConv?.raw_psid;
+        
+        if (!psid) {
+          console.error(`ไม่พบ PSID สำหรับ conversation: ${conversationId}`);
+          continue;
+        }
+
+        // ส่งข้อความทีละข้อความ (ถ้าต้องการส่งทีละข้อความ)
+        for (const message of defaultMessages) {
+          await fetch(`http://localhost:8000/send/${selectedPage}/${psid}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: message }),
+          });
+          
+          // หน่วงเวลาเล็กน้อยระหว่างการส่งข้อความแต่ละข้อความ
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      alert(`ส่งข้อความเรียบร้อยแล้ว! ส่งไปยัง ${selectedConversationIds.length} การสนทนา จำนวน ${defaultMessages.length} ข้อความ`);
+      
+      // ล้างการเลือก checkbox หลังส่งเสร็จ
+      setSelectedConversationIds([]);
+      
+    } catch (error) {
+      console.error("เกิดข้อผิดพลาดในการส่งข้อความ:", error);
+      alert("เกิดข้อผิดพลาดในการส่งข้อความ กรุณาลองใหม่อีกครั้ง");
+    }
   };
 
   return (
@@ -222,7 +265,7 @@ function App() {
             </option>
           ))}
         </select>
-        <Link to="/App" className="title" style={{marginLeft:"64px"}}>หน้าแรก</Link><br />
+         <Link to="/App" className="title" style={{marginLeft:"64px"}}>หน้าแรก</Link><br />
         <Link to="/Set_Miner" className="title" style={{marginLeft:"50px"}}>ตั้งค่าระบบขุด</Link><br />
         <a href="#" className="title" style={{marginLeft:"53px"}}>Dashboard</a><br />
         <a href="#" className="title" style={{marginLeft:"66px"}}>Setting</a><br />
@@ -319,6 +362,16 @@ function App() {
           </div>
         )}
 
+        {/* 🔥 แสดงจำนวนข้อความที่จะส่ง */}
+        <div style={{ margin: "10px 0", padding: "10px", backgroundColor: "#f0f8ff", borderRadius: "5px" }}>
+          <strong>📝 ข้อความที่จะส่ง: {getDefaultMessages().length} ข้อความ</strong>
+          {getDefaultMessages().length === 0 && (
+            <span style={{ color: "red", marginLeft: "10px" }}>
+              (กรุณาไปตั้งค่าข้อความใน 'ตั้งค่าระบบขุด' ก่อน)
+            </span>
+          )}
+        </div>
+
         {/* Table */}
         {loading ? (
           <p>⏳ กำลังโหลด...</p>
@@ -364,9 +417,30 @@ function App() {
             </tbody>
           </table>
         )}
-        <button onClick={sendMessageToSelected} style={{ marginTop: "10px" }}>
-          📥 ขุด
-        </button>
+        
+        {/* 🔥 ปุ่มขุดที่ปรับปรุงแล้ว */}
+        <div style={{ marginTop: "15px", display: "flex", alignItems: "center", gap: "10px" }}>
+          <button 
+            onClick={sendMessageToSelected} 
+            style={{ 
+              backgroundColor: selectedConversationIds.length > 0 ? "#28a745" : "#6c757d",
+              color: "white",
+              padding: "10px 20px",
+              border: "none",
+              borderRadius: "5px",
+              cursor: selectedConversationIds.length > 0 ? "pointer" : "not-allowed"
+            }}
+            disabled={selectedConversationIds.length === 0}
+          >
+            📥 ขุด ({selectedConversationIds.length} รายการ)
+          </button>
+          
+          {selectedConversationIds.length > 0 && (
+            <span style={{ color: "#666" }}>
+              จะส่งข้อความ {getDefaultMessages().length} ข้อความ ไปยัง {selectedConversationIds.length} การสนทนา
+            </span>
+          )}
+        </div>
       </main>
     </div>
   );
