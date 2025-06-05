@@ -62,6 +62,27 @@ function App() {
     loadMessages();
   }, [selectedPage]);
 
+  // 🔥 ฟังก์ชันดึงข้อความล่าสุดของ User จาก conversation
+  const getLastUserMessageTime = async (conversationId, pageId) => {
+    try {
+      const response = await axios.get(`http://localhost:8000/messages/${pageId}/${conversationId}`);
+      const messages = response.data.data || [];
+      
+      // หาข้อความล่าสุดของ User (ไม่ใช่ของเพจ)
+      for (const message of messages) {
+        const senderId = message.from?.id;
+        if (senderId && senderId !== pageId) {
+          return message.created_time;
+        }
+      }
+      
+      return null; // ไม่พบข้อความของ User
+    } catch (error) {
+      console.error(`Error fetching messages for conversation ${conversationId}:`, error);
+      return null;
+    }
+  };
+
   // ฟังก์ชันแปลงเวลาห่าง
   function timeAgo(dateString) {
     if (!dateString) return "-";
@@ -79,39 +100,52 @@ function App() {
     return `${diffDay} วันที่แล้ว`;
   }
 
-  // ฟังก์ชันโหลดข้อมูล conversations
-  const fetchConversations = (pageId) => {
+  // ฟังก์ชันโหลดข้อมูล conversations พร้อมดึงเวลาข้อความล่าสุดของ User
+  const fetchConversations = async (pageId) => {
     if (!pageId) return;
 
     setLoading(true);
-    axios.get(`http://localhost:8000/psids?page_id=${pageId}`)
-      .then(res => {
-        const allConvs = res.data.conversations || [];
-        const mapped = allConvs.map((conv, idx) => {
+    try {
+      const res = await axios.get(`http://localhost:8000/psids?page_id=${pageId}`);
+      const allConvs = res.data.conversations || [];
+      
+      console.log(`🔄 กำลังดึงข้อมูลข้อความล่าสุดสำหรับ ${allConvs.length} การสนทนา...`);
+      
+      // ดึงข้อความล่าสุดของ User สำหรับแต่ละ conversation
+      const conversationsWithUserTime = await Promise.all(
+        allConvs.map(async (conv, idx) => {
           const userName = conv.names && conv.names[0]
             ? conv.names[0]
             : (conv.participants && conv.participants[0]?.name)
               ? conv.participants[0].name
               : 'ไม่ทราบชื่อ';
+
+          // 🔥 ดึงเวลาข้อความล่าสุดของ User
+          const lastUserMessageTime = await getLastUserMessageTime(conv.conversation_id, pageId);
+          
           return {
             id: idx + 1,
-            updated_time: conv.updated_time,
+            updated_time: conv.updated_time, // เวลาอัปเดตของ conversation
             created_time: conv.created_time,
+            last_user_message_time: lastUserMessageTime, // 🔥 เพิ่มเวลาข้อความล่าสุดของ User
             sender_name: conv.psids[0] || "Unknown",
             conversation_id: conv.conversation_id,
             conversation_name: ` ${userName}`,
             user_name: userName,
             raw_psid: conv.psids[0]
           };
-        });
-        setConversations(mapped);
-        setAllConversations(mapped);
-      })
-      .catch(err => {
-        alert("เกิดข้อผิดพลาด");
-        console.error(err);
-      })
-      .finally(() => setLoading(false));
+        })
+      );
+
+      console.log(`✅ ดึงข้อมูลข้อความล่าสุดเสร็จสิ้น`);
+      setConversations(conversationsWithUserTime);
+      setAllConversations(conversationsWithUserTime);
+    } catch (err) {
+      alert("เกิดข้อผิดพลาด");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // โหลดข้อมูลทันทีเมื่อเลือกเพจ
@@ -148,11 +182,15 @@ function App() {
   const applyFilters = () => {
     let filtered = [...allConversations];
 
-    // ตัวอย่าง filter: disappearTime
+    // 🔥 แก้ไข filter: disappearTime ให้ใช้ last_user_message_time แทน updated_time
     if (disappearTime) {
       const now = new Date();
       filtered = filtered.filter(conv => {
-        const updated = new Date(conv.updated_time);
+        // ใช้เวลาข้อความล่าสุดของ User หากมี ถ้าไม่มีใช้ updated_time
+        const referenceTime = conv.last_user_message_time || conv.updated_time;
+        if (!referenceTime) return false;
+        
+        const updated = new Date(referenceTime);
         const diffDays = (now - updated) / (1000 * 60 * 60 * 24);
 
         switch (disappearTime) {
@@ -309,7 +347,7 @@ function App() {
               value={disappearTime}
               onChange={(e) => setDisappearTime(e.target.value)}
             >
-              <option value="">ระยะเวลาที่หายไป</option>
+              <option value="">ระยะเวลาที่หายไป (จากข้อความล่าสุดของ User)</option>
               <option value="1d">ภายใน 1 วัน</option>
               <option value="3d">ภายใน 3 วัน</option>
               <option value="7d">ภายใน 1 สัปดาห์</option>
@@ -420,7 +458,13 @@ function App() {
                       : "-"
                     }
                   </td>
-                  <td className="table">{timeAgo(conv.updated_time)}</td>
+                  <td className="table" >
+                    {/* 🔥 แสดงเวลาจากข้อความล่าสุดของ User */}
+                    {conv.last_user_message_time 
+                      ? timeAgo(conv.last_user_message_time)
+                      : timeAgo(conv.updated_time) 
+                    }
+                  </td>
                   <td className="table">Context</td>
                   <td className="table">สินค้าที่สนใจ</td>
                   <td className="table">Platform</td>
@@ -442,23 +486,13 @@ function App() {
         {/* 🔥 ปุ่มขุดที่ปรับปรุงแล้ว */}
         <div style={{ marginTop: "15px", display: "flex", alignItems: "center", gap: "10px" }}>
           <button
-            onClick={sendMessageToSelected}
-            style={{
-              backgroundColor: selectedConversationIds.length > 0 ? "#28a745" : "#6c757d",
-              color: "white",
-              padding: "10px 20px",
-              border: "none",
-              borderRadius: "5px",
-              cursor: selectedConversationIds.length > 0 ? "pointer" : "not-allowed"
-            }}
-            disabled={selectedConversationIds.length === 0}
-          >
+            onClick={sendMessageToSelected} className={`button-default ${selectedConversationIds.length > 0 ? "button-active" : ""}`}>
             📥 ขุด ({selectedConversationIds.length} รายการ)
           </button>
 
           {selectedConversationIds.length > 0 && (
             <span style={{ color: "#666" }}>
-              จะส่งข้อความ {defaultMessages.length} ข้อความ ไปยัง {selectedConversationIds.length} การสนทนา
+              จะส่งข้อความ {defaultMessages.length} ข้อความ 
             </span>
           )}
         </div>

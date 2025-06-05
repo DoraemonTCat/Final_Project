@@ -240,3 +240,16 @@ body {
   background-color: #cccccc;
   cursor: not-allowed;
 }
+.button-default {
+  background-color: #6c757d;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: not-allowed;
+}
+
+.button-active {
+  background-color: #28a745;
+  cursor: pointer;
+}
