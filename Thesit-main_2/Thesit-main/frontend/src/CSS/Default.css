@@ -82,3 +82,226 @@
   border-radius: 5px;
   
 }
+/* ✅ เพิ่ม CSS สำหรับส่วนอัพโหลดสื่อ */
+.media-upload-section {
+  margin: 20px 0;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.media-group {
+  margin-bottom: 25px;
+  background: white;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.media-header {
+  background: #f1f3f4;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e1e5e9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.media-icon {
+  font-size: 16px;
+}
+
+.media-title {
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.media-upload-area {
+  padding: 20px;
+}
+
+.upload-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #cbd5e0;
+  border-radius: 6px;
+  padding: 40px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #fafbfc;
+  min-height: 120px;
+}
+
+.upload-button:hover {
+  border-color: #4285f4;
+  background: #f8f9ff;
+}
+
+.upload-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+  color: #5f6368;
+}
+
+.upload-button span:last-child {
+  color: #5f6368;
+  font-size: 14px;
+}
+
+.media-preview {
+  margin-top: 15px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.media-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  background: white;
+  max-width: 150px;
+}
+
+.media-thumbnail {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.media-name {
+  font-size: 12px;
+  color: #5f6368;
+  text-align: center;
+  word-break: break-all;
+  max-width: 120px;
+  line-height: 1.2;
+}
+
+.remove-media-btn {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-media-btn:hover {
+  background: #cc0000;
+}
+
+/* Card Sections */
+.card-section {
+  margin-bottom: 20px;
+  background: white;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.card-header {
+  background: #f1f3f4;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e1e5e9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-icon {
+  font-size: 16px;
+}
+
+.card-title {
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.card-content {
+  padding: 20px;
+  min-height: 60px;
+  background: #fafbfc;
+}
+
+/* Message Box Section */
+.message-box-section {
+  background: white;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.message-box-header {
+  background: #f1f3f4;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e1e5e9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.message-icon {
+  font-size: 16px;
+}
+
+.message-title {
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.message-count {
+  padding: 12px 16px;
+  color: #666;
+  font-size: 13px;
+  background: #fafbfc;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .media-upload-section {
+    padding: 15px;
+  }
+  
+  .upload-button {
+    padding: 30px 15px;
+    min-height: 100px;
+  }
+  
+  .upload-icon {
+    font-size: 20px;
+  }
+  
+  .media-preview {
+    gap: 8px;
+  }
+  
+  .media-item {
+    max-width: 120px;
+  }
+  
+  .media-thumbnail {
+    width: 60px;
+    height: 60px;
+  }
+}
