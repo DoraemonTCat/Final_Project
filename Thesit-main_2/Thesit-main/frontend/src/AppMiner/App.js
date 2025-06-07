@@ -62,27 +62,6 @@ function App() {
     loadMessages();
   }, [selectedPage]);
 
-  // 🔥 ฟังก์ชันดึงข้อความล่าสุดของ User จาก conversation
-  const getLastUserMessageTime = async (conversationId, pageId) => {
-    try {
-      const response = await axios.get(`http://localhost:8000/messages/${pageId}/${conversationId}`);
-      const messages = response.data.data || [];
-      
-      // หาข้อความล่าสุดของ User (ไม่ใช่ของเพจ)
-      for (const message of messages) {
-        const senderId = message.from?.id;
-        if (senderId && senderId !== pageId) {
-          return message.created_time;
-        }
-      }
-      
-      return null; // ไม่พบข้อความของ User
-    } catch (error) {
-      console.error(`Error fetching messages for conversation ${conversationId}:`, error);
-      return null;
-    }
-  };
-
   // ฟังก์ชันแปลงเวลาห่าง
   function timeAgo(dateString) {
     if (!dateString) return "-";
@@ -100,49 +79,55 @@ function App() {
     return `${diffDay} วันที่แล้ว`;
   }
 
-  // ฟังก์ชันโหลดข้อมูล conversations พร้อมดึงเวลาข้อความล่าสุดของ User
+  // 🚀 ฟังก์ชันโหลดข้อมูล conversations แบบใหม่ - ใช้ batch API เพื่อความเร็ว
   const fetchConversations = async (pageId) => {
     if (!pageId) return;
 
     setLoading(true);
     try {
-      const res = await axios.get(`http://localhost:8000/psids?page_id=${pageId}`);
-      const allConvs = res.data.conversations || [];
+      console.log(`🚀 เริ่มดึงข้อมูล conversations แบบ optimized สำหรับ page_id: ${pageId}`);
       
-      console.log(`🔄 กำลังดึงข้อมูลข้อความล่าสุดสำหรับ ${allConvs.length} การสนทนา...`);
+      // 🔥 ใช้ endpoint ใหม่ที่เร็วกว่า
+      const res = await axios.get(`http://localhost:8000/conversations-with-last-message/${pageId}`);
       
-      // ดึงข้อความล่าสุดของ User สำหรับแต่ละ conversation
-      const conversationsWithUserTime = await Promise.all(
-        allConvs.map(async (conv, idx) => {
-          const userName = conv.names && conv.names[0]
-            ? conv.names[0]
-            : (conv.participants && conv.participants[0]?.name)
-              ? conv.participants[0].name
-              : 'ไม่ทราบชื่อ';
+      if (res.data.error) {
+        console.error("❌ API Error:", res.data.error);
+        alert(`เกิดข้อผิดพลาด: ${res.data.error}`);
+        return;
+      }
 
-          // 🔥 ดึงเวลาข้อความล่าสุดของ User
-          const lastUserMessageTime = await getLastUserMessageTime(conv.conversation_id, pageId);
-          
-          return {
-            id: idx + 1,
-            updated_time: conv.updated_time, // เวลาอัปเดตของ conversation
-            created_time: conv.created_time,
-            last_user_message_time: lastUserMessageTime, // 🔥 เพิ่มเวลาข้อความล่าสุดของ User
-            sender_name: conv.psids[0] || "Unknown",
-            conversation_id: conv.conversation_id,
-            conversation_name: ` ${userName}`,
-            user_name: userName,
-            raw_psid: conv.psids[0]
-          };
-        })
-      );
+      const conversationsData = res.data.conversations || [];
+      console.log(`✅ ดึงข้อมูล conversations สำเร็จ: ${conversationsData.length} รายการ`);
+      
+      if (res.data.optimization) {
+        console.log(`🚀 การปรับปรุง: ${res.data.optimization}`);
+      }
 
-      console.log(`✅ ดึงข้อมูลข้อความล่าสุดเสร็จสิ้น`);
-      setConversations(conversationsWithUserTime);
-      setAllConversations(conversationsWithUserTime);
+      // 🔥 ข้อมูลที่ได้มาจาก API ใหม่มีข้อมูลครบแล้ว ไม่ต้องดึงเพิ่ม!
+      const formattedConversations = conversationsData.map((conv, idx) => ({
+        id: idx + 1,
+        updated_time: conv.updated_time,
+        created_time: conv.created_time,
+        last_user_message_time: conv.last_user_message_time, // 🔥 มีข้อมูลนี้แล้วจาก API
+        sender_name: conv.psids[0] || "Unknown",
+        conversation_id: conv.conversation_id,
+        conversation_name: conv.conversation_name,
+        user_name: conv.user_name,
+        raw_psid: conv.raw_psid || conv.psids[0]
+      }));
+
+      console.log(`✅ จัดรูปแบบข้อมูลเสร็จสิ้น: ${formattedConversations.length} รายการ`);
+      setConversations(formattedConversations);
+      setAllConversations(formattedConversations);
+
     } catch (err) {
-      alert("เกิดข้อผิดพลาด");
-      console.error(err);
+      console.error("❌ เกิดข้อผิดพลาดในการดึงข้อมูล:", err);
+      
+      if (err.response?.status === 400) {
+        alert("กรุณาเชื่อมต่อ Facebook Page ก่อนใช้งาน");
+      } else {
+        alert(`เกิดข้อผิดพลาด: ${err.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -215,6 +200,7 @@ function App() {
         }
       });
     }
+    
     // ตัวอย่าง filter: customerType (สมมติใน conv มี customerType)
     if (customerType) {
       filtered = filtered.filter(conv => conv.customerType === customerType);
@@ -332,13 +318,19 @@ function App() {
 
       {/* Main Dashboard */}
       <main className="main-dashboard">
-        <h2>📋 ตารางการขุด</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+          <h2>📋 ตารางการขุด</h2>
+
+          <p>ชื่อ User</p>
+        </div>
+
         <button
           className="filter-toggle-button"
           onClick={() => setShowFilter(prev => !prev)}
         >
           🧰 ตัวกรอง
         </button>
+        
         {showFilter && (
           <div className="filter-bar">
             {/* ตัวกรองตามเดิม */}
@@ -424,11 +416,25 @@ function App() {
         {/* 🔥 แสดงจำนวนข้อความที่จะส่ง */}
         <div style={{ margin: "10px 0", padding: "10px", backgroundColor: "#f0f8ff", borderRadius: "5px" }}>
           <strong>📝 ข้อความที่จะส่ง: {defaultMessages.length} ข้อความ</strong>
+          {displayData.length > 0 && (
+            <span style={{ marginLeft: "20px", color: "#666" }}>
+              📊 มี: {displayData.length} การสนทนา
+            </span>
+          )}
         </div>
 
         {/* Table */}
         {loading ? (
-          <p>⏳ กำลังโหลด...</p>
+          <div style={{ textAlign: "center", padding: "40px" }}>
+            <p style={{ fontSize: "18px" }}>⏳ กำลังโหลดข้อมูล...</p>
+            <p style={{ color: "#666" }}>กำลังใช้ Batch API เพื่อเร็วขึ้น</p>
+          </div>
+        ) : displayData.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px" }}>
+            <p style={{ fontSize: "18px", color: "#666" }}>
+              {selectedPage ? "ไม่พบข้อมูลการสนทนา" : "กรุณาเลือกเพจเพื่อแสดงข้อมูล"}
+            </p>
+          </div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "#fff" }}>
             <thead>
@@ -486,8 +492,15 @@ function App() {
         {/* 🔥 ปุ่มขุดที่ปรับปรุงแล้ว */}
         <div style={{ marginTop: "15px", display: "flex", alignItems: "center", gap: "10px" }}>
           <button
-            onClick={sendMessageToSelected} className={`button-default ${selectedConversationIds.length > 0 ? "button-active" : ""}`}>
+            onClick={sendMessageToSelected} 
+            className={`button-default ${selectedConversationIds.length > 0 ? "button-active" : ""}`}
+            disabled={loading}
+          >
             📥 ขุด ({selectedConversationIds.length} รายการ)
+            
+          </button>
+          <button onClick={handleFetchConversations} className="Re-default" disabled={loading || !selectedPage}>
+            {loading ? "⏳ กำลังโหลด..." : "🔄 รีเฟรชข้อมูล"}
           </button>
 
           {selectedConversationIds.length > 0 && (

@@ -252,6 +252,18 @@ body {
 }
 
 .button-active {
-  background-color: #28a745;
+  background-color: #10a6e1;
   cursor: pointer;
+}
+.Re-default{
+  background-color: #28a745;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.Re-default:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }

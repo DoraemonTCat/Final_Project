@@ -360,3 +360,144 @@ async def debug_conversations(page_id: str):
         "token_preview": f"{access_token[:20]}..." if access_token else None,
         "raw_data": raw_conversations
     }
+
+# เพิ่ม endpoint ใหม่ใน facebook.py
+@router.get("/conversations-with-last-message/{page_id}")
+async def get_conversations_with_last_message(page_id: str):
+    """ดึง conversations พร้อมข้อความล่าสุดในครั้งเดียว - เพื่อลดการเรียก API"""
+    print(f"🚀 เริ่มดึงข้อมูล conversations พร้อมข้อความล่าสุดสำหรับ page_id: {page_id}")
+    
+    # ตรวจสอบ access token
+    access_token = page_tokens.get(page_id)
+    if not access_token:
+        print(f"❌ ไม่พบ access_token สำหรับ page_id: {page_id}")
+        return JSONResponse(
+            status_code=400, 
+            content={"error": f"ไม่พบ access_token สำหรับ page_id: {page_id}. กรุณาเชื่อมต่อเพจก่อน"}
+        )
+    
+    try:
+        # 🔥 Step 1: ดึง conversations พร้อม participants ในครั้งเดียว
+        conversations_endpoint = f"{page_id}/conversations"
+        conversations_params = {
+            "fields": "participants,updated_time,id",
+            "limit": 100
+        }
+        
+        print("🔍 กำลังดึงข้อมูล conversations...")
+        conversations_result = fb_get(conversations_endpoint, conversations_params, access_token)
+        
+        if "error" in conversations_result:
+            print(f"❌ Error getting conversations: {conversations_result['error']}")
+            return JSONResponse(status_code=400, content={"error": conversations_result["error"]})
+        
+        conversations_data = conversations_result.get("data", [])
+        print(f"✅ พบ conversations จำนวน: {len(conversations_data)}")
+        
+        if not conversations_data:
+            return {"conversations": [], "total": 0}
+        
+        # 🔥 Step 2: ดึงข้อความล่าสุดพร้อมกันแบบ batch
+        result_conversations = []
+        
+        # สร้าง batch requests สำหรับดึงข้อความล่าสุด
+        batch_requests = []
+        for i, conv in enumerate(conversations_data):
+            conversation_id = conv.get("id")
+            batch_requests.append({
+                "method": "GET",
+                "relative_url": f"{conversation_id}/messages?fields=message,from,created_time&limit=10"
+            })
+        
+        # 🚀 ส่ง batch request เพื่อดึงข้อความทั้งหมดในครั้งเดียว
+        print(f"🚀 กำลังส่ง batch request สำหรับ {len(batch_requests)} conversations...")
+        
+        # Facebook Graph API Batch Request
+        batch_url = "https://graph.facebook.com/v14.0/"
+        batch_params = {
+            "access_token": access_token,
+            "batch": str(batch_requests).replace("'", '"')  # แปลงเป็น JSON string
+        }
+        
+        import requests
+        batch_response = requests.post(batch_url, data=batch_params)
+        batch_results = batch_response.json()
+        
+        print(f"✅ ได้รับผลลัพธ์ batch request: {len(batch_results)} รายการ")
+        
+        # 🔥 Step 3: ประมวลผลข้อมูลทั้งหมด
+        for i, conv in enumerate(conversations_data):
+            conversation_id = conv.get("id")
+            updated_time = conv.get("updated_time")
+            participants = conv.get("participants", {}).get("data", [])
+            
+            # หา user participants (ไม่ใช่ page)
+            user_psids = []
+            user_names = []
+            
+            for participant in participants:
+                participant_id = participant.get("id")
+                if participant_id and participant_id != page_id:
+                    user_psids.append(participant_id)
+                    user_name = participant.get("name")
+                    
+                    if not user_name:
+                        user_name = f"User...{participant_id[-8:]}" if len(participant_id) > 8 else f"User {participant_id}"
+                    
+                    user_names.append(user_name)
+            
+            # ดึงข้อมูลข้อความจาก batch result
+            last_user_message_time = None
+            first_created_time = None
+            
+            if i < len(batch_results) and batch_results[i].get("code") == 200:
+                try:
+                    import json
+                    messages_data = json.loads(batch_results[i]["body"])
+                    messages = messages_data.get("data", [])
+                    
+                    # หาข้อความล่าสุดของ user และข้อความแรกสุด
+                    if messages:
+                        first_created_time = messages[-1].get("created_time")  # ข้อความแรกสุด
+                        
+                        # หาข้อความล่าสุดของ user (ไม่ใช่ page)
+                        for message in messages:
+                            sender_id = message.get("from", {}).get("id")
+                            if sender_id and sender_id != page_id:
+                                last_user_message_time = message.get("created_time")
+                                break
+                                
+                except Exception as e:
+                    print(f"⚠️ Error parsing messages for conversation {conversation_id}: {e}")
+            
+            # เพิ่มข้อมูลลงใน result
+            if user_psids:
+                user_name = user_names[0] if user_names else "ไม่ทราบชื่อ"
+                
+                result_conversations.append({
+                    "id": i + 1,
+                    "conversation_id": conversation_id,
+                    "conversation_name": f" {user_name}",
+                    "user_name": user_name,
+                    "psids": user_psids,
+                    "names": user_names,
+                    "raw_psid": user_psids[0],
+                    "updated_time": updated_time,
+                    "created_time": first_created_time,
+                    "last_user_message_time": last_user_message_time  # 🔥 เวลาข้อความล่าสุดของ user
+                })
+        
+        print(f"✅ ประมวลผลเสร็จสิ้น: {len(result_conversations)} conversations พร้อมข้อมูลข้อความล่าสุด")
+        
+        return {
+            "conversations": result_conversations, 
+            "total": len(result_conversations),
+            "optimization": "Used batch API to reduce requests"
+        }
+        
+    except Exception as e:
+        print(f"❌ เกิดข้อผิดพลาด: {e}")
+        return JSONResponse(
+            status_code=500, 
+            content={"error": f"เกิดข้อผิดพลาดในการดึงข้อมูล: {str(e)}"}
+        )
