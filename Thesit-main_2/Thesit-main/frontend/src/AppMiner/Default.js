@@ -6,25 +6,21 @@ import { fetchPages, connectFacebook, saveMessageToDB, getMessagesByPageId, dele
 function SetDefault() {
   const [pages, setPages] = useState([]);
   const [selectedPage, setSelectedPage] = useState("");
-  const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  
-  // ✅ เพิ่ม state สำหรับไฟล์สื่อ
-  const [mediaFiles, setMediaFiles] = useState({
-    videos: [],
-    images1: [],
-    images2: []
+  const [messageSequence, setMessageSequence] = useState([]);
+  const [currentInput, setCurrentInput] = useState({
+    type: 'text',
+    content: '',
+    file: null,
+    preview: null
   });
 
-  // ✅ โหลดเพจเมื่อ component mount
   useEffect(() => {
     const loadPages = async () => {
       try {
         const pagesData = await fetchPages();
         setPages(pagesData);
         
-        // โหลด selectedPage จาก localStorage
         const savedPage = localStorage.getItem("selectedPage");
         if (savedPage && pagesData.some(page => page.id === savedPage)) {
           setSelectedPage(savedPage);
@@ -37,7 +33,6 @@ function SetDefault() {
     loadPages();
   }, []);
 
-  // ✅ โหลดข้อความเมื่อเปลี่ยน selectedPage
   useEffect(() => {
     const loadMessages = async () => {
       if (selectedPage) {
@@ -46,15 +41,23 @@ function SetDefault() {
           console.log(`🔄 กำลังโหลดข้อความสำหรับ page_id: ${selectedPage}`);
           const data = await getMessagesByPageId(selectedPage);
           console.log(`✅ โหลดข้อความสำเร็จ:`, data);
-          setMessages(Array.isArray(data) ? data : []);
+          
+          const sequenceData = Array.isArray(data) ? data.map((msg, index) => ({
+            id: msg.id || Date.now() + index,
+            type: 'text',
+            content: msg.message,
+            order: index,
+            originalData: msg
+          })) : [];
+          setMessageSequence(sequenceData);
         } catch (err) {
           console.error("โหลดข้อความล้มเหลว:", err);
-          setMessages([]);
+          setMessageSequence([]);
         } finally {
           setLoading(false);
         }
       } else {
-        setMessages([]);
+        setMessageSequence([]);
       }
     };
 
@@ -66,53 +69,118 @@ function SetDefault() {
     console.log(`📄 เปลี่ยนเพจเป็น: ${pageId}`);
     setSelectedPage(pageId);
     
-    // บันทึก selectedPage ลง localStorage
     if (pageId) {
       localStorage.setItem("selectedPage", pageId);
     } else {
       localStorage.removeItem("selectedPage");
     }
     
-    // รีเซ็ตข้อความที่กำลังพิมพ์และไฟล์สื่อ
-    setNewMessage("");
-    setMediaFiles({
-      videos: [],
-      images1: [],
-      images2: []
+    setCurrentInput({
+      type: 'text',
+      content: '',
+      file: null,
+      preview: null
     });
   };
 
-  // ✅ ฟังก์ชันจัดการไฟล์สื่อ
-  const handleFileUpload = (event, mediaType) => {
-    const files = Array.from(event.target.files);
-    const fileData = files.map(file => ({
-      file,
-      preview: URL.createObjectURL(file),
-      name: file.name,
-      type: file.type,
-      size: file.size
-    }));
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
 
-    setMediaFiles(prev => ({
+    const preview = URL.createObjectURL(file);
+    setCurrentInput(prev => ({
       ...prev,
-      [mediaType]: [...prev[mediaType], ...fileData]
+      file,
+      preview,
+      content: file.name
     }));
   };
 
-  const removeMediaFile = (mediaType, index) => {
-    setMediaFiles(prev => {
-      const newFiles = [...prev[mediaType]];
-      // ลบ URL object เพื่อป้องกัน memory leak
-      URL.revokeObjectURL(newFiles[index].preview);
-      newFiles.splice(index, 1);
-      return {
-        ...prev,
-        [mediaType]: newFiles
-      };
+  const addToSequence = () => {
+    if (!selectedPage) {
+      alert("กรุณาเลือกเพจก่อน");
+      return;
+    }
+
+    if (currentInput.type === 'text' && !currentInput.content.trim()) {
+      alert("กรุณากรอกข้อความ");
+      return;
+    }
+
+    if ((currentInput.type === 'image' || currentInput.type === 'video') && !currentInput.file) {
+      alert("กรุณาเลือกไฟล์");
+      return;
+    }
+
+    const newItem = {
+      id: Date.now(),
+      type: currentInput.type,
+      content: currentInput.content || currentInput.file?.name || '',
+      file: currentInput.file,
+      preview: currentInput.preview,
+      order: messageSequence.length
+    };
+
+    setMessageSequence(prev => [...prev, newItem]);
+    
+    if (currentInput.preview) {
+      URL.revokeObjectURL(currentInput.preview);
+    }
+    setCurrentInput({
+      type: 'text',
+      content: '',
+      file: null,
+      preview: null
     });
   };
 
-  // ✅ ฟังก์ชันแปลงไฟล์เป็น base64
+  const removeFromSequence = (id) => {
+    setMessageSequence(prev => {
+      const itemToDelete = prev.find(item => item.id === id);
+      if (itemToDelete?.preview) {
+        URL.revokeObjectURL(itemToDelete.preview);
+      }
+      
+      const newSequence = prev.filter(item => item.id !== id);
+      return newSequence.map((item, index) => ({
+        ...item,
+        order: index
+      }));
+    });
+  };
+
+  const handleDragStart = (e, index) => {
+    e.dataTransfer.setData('text/plain', index.toString());
+    e.currentTarget.classList.add('drag-start');
+  };
+
+  const handleDragEnd = (e) => {
+    e.currentTarget.classList.remove('drag-start');
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e, dropIndex) => {
+    e.preventDefault();
+    const dragIndex = parseInt(e.dataTransfer.getData('text/plain'));
+    
+    if (dragIndex === dropIndex) return;
+
+    const newSequence = [...messageSequence];
+    const draggedItem = newSequence[dragIndex];
+    
+    newSequence.splice(dragIndex, 1);
+    newSequence.splice(dropIndex, 0, draggedItem);
+    
+    newSequence.forEach((item, index) => {
+      item.order = index;
+    });
+    
+    setMessageSequence(newSequence);
+  };
+
   const convertFileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -122,131 +190,71 @@ function SetDefault() {
     });
   };
 
-  // ✅ ฟังก์ชันเตรียมข้อมูลสื่อสำหรับบันทึก
-  const prepareMediaData = async () => {
-    const mediaData = {
-      videos: [],
-      images1: [],
-      images2: []
-    };
-
-    try {
-      // แปลงวิดีโอเป็น base64
-      for (const video of mediaFiles.videos) {
-        const base64 = await convertFileToBase64(video.file);
-        mediaData.videos.push({
-          name: video.name,
-          type: video.type,
-          size: video.size,
-          data: base64
-        });
-      }
-
-      // แปลงรูปภาพชุดที่ 1 เป็น base64
-      for (const image of mediaFiles.images1) {
-        const base64 = await convertFileToBase64(image.file);
-        mediaData.images1.push({
-          name: image.name,
-          type: image.type,
-          size: image.size,
-          data: base64
-        });
-      }
-
-      // แปลงรูปภาพชุดที่ 2 เป็น base64
-      for (const image of mediaFiles.images2) {
-        const base64 = await convertFileToBase64(image.file);
-        mediaData.images2.push({
-          name: image.name,
-          type: image.type,
-          size: image.size,
-          data: base64
-        });
-      }
-
-      return mediaData;
-    } catch (error) {
-      console.error("เกิดข้อผิดพลาดในการแปลงไฟล์:", error);
-      throw error;
-    }
-  };
-
-  // ✅ ฟังก์ชันบันทึกข้อความพร้อมสื่อ
-  const handleAddMessage = async () => {
-    if (!selectedPage) {
-      alert("กรุณาเลือกเพจก่อน");
-      return;
-    }
+  const saveMessageSequence = async () => {
+    const newMessages = messageSequence.filter(item => !item.originalData);
     
-    if (!newMessage.trim()) {
-      alert("กรุณากรอกข้อความ");
+    if (newMessages.length === 0) {
+      alert("ไม่มีข้อความใหม่ให้บันทึก");
       return;
     }
 
-    // ตรวจสอบว่ามีไฟล์สื่อหรือไม่
-    const hasMedia = mediaFiles.videos.length > 0 || 
-                     mediaFiles.images1.length > 0 || 
-                     mediaFiles.images2.length > 0;
-
     try {
-      console.log(`💾 กำลังบันทึกข้อความ: "${newMessage}" สำหรับ page_id: ${selectedPage}`);
-      
-      let messageData = {
-        page_id: selectedPage,
-        message: newMessage.trim()
-      };
+      console.log("🔄 กำลังบันทึกข้อความใหม่:", newMessages);
 
-      // ถ้ามีไฟล์สื่อ ให้เตรียมข้อมูลสื่อ
-      if (hasMedia) {
-        console.log("📎 กำลังเตรียมข้อมูลสื่อ...");
-        const mediaData = await prepareMediaData();
-        messageData.media = mediaData;
+      for (let i = 0; i < newMessages.length; i++) {
+        const item = newMessages[i];
         
-        console.log("📊 ข้อมูลสื่อที่เตรียมได้:", {
-          videos: mediaData.videos.length,
-          images1: mediaData.images1.length,
-          images2: mediaData.images2.length
-        });
-      }
+        let mediaData = null;
+        
+        if (item.file) {
+          const base64 = await convertFileToBase64(item.file);
+          
+          if (item.type === 'image') {
+            mediaData = {
+              images1: [{
+                name: item.file.name,
+                type: item.file.type,
+                size: item.file.size,
+                data: base64
+              }],
+              videos: [],
+              images2: []
+            };
+          } else if (item.type === 'video') {
+            mediaData = {
+              videos: [{
+                name: item.file.name,
+                type: item.file.type,
+                size: item.file.size,
+                data: base64
+              }],
+              images1: [],
+              images2: []
+            };
+          }
+        }
 
-      // บันทึกข้อความพร้อมสื่อ
-      const savedMsg = await saveMessageToDB(selectedPage, newMessage.trim(), hasMedia ? messageData.media : null);
-      console.log(`✅ บันทึกสำเร็จ:`, savedMsg);
+        const content = item.type === 'text' ? item.content : `[${item.type.toUpperCase()}] ${item.content}`;
+        await saveMessageToDB(selectedPage, content, mediaData);
+        
+        console.log(`✅ บันทึกรายการใหม่ที่ ${i + 1} สำเร็จ`);
+      }
       
-      // เพิ่มข้อความใหม่เข้าไปใน state พร้อมข้อมูลสื่อ
-      const newMessageItem = {
-        ...savedMsg,
-        media: hasMedia ? messageData.media : null,
-        mediaCount: {
-          videos: mediaFiles.videos.length,
-          images1: mediaFiles.images1.length,
-          images2: mediaFiles.images2.length
-        }
-      };
+      alert(`บันทึกข้อความใหม่สำเร็จ! จำนวน ${newMessages.length} รายการ`);
       
-      setMessages(prevMessages => [...prevMessages, newMessageItem]);
-      
-      // รีเซ็ตฟอร์ม
-      setNewMessage("");
-      
-      // ลบไฟล์สื่อและ URL previews
-      Object.values(mediaFiles).flat().forEach(file => {
-        if (file.preview) {
-          URL.revokeObjectURL(file.preview);
-        }
-      });
-      
-      setMediaFiles({
-        videos: [],
-        images1: [],
-        images2: []
-      });
-      
-      alert("บันทึกข้อความพร้อมสื่อสำเร็จ!");
+      const data = await getMessagesByPageId(selectedPage);
+      const sequenceData = Array.isArray(data) ? data.map((msg, index) => ({
+        id: msg.id || Date.now() + index,
+        type: 'text',
+        content: msg.message,
+        order: index,
+        originalData: msg
+      })) : [];
+      setMessageSequence(sequenceData);
       
     } catch (error) {
-      console.error("เกิดข้อผิดพลาดในการบันทึกข้อความ:", error);
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อความ: " + error.message);
+      console.error("เกิดข้อผิดพลาดในการบันทึก:", error);
+      alert("เกิดข้อผิดพลาดในการบันทึก: " + error.message);
     }
   };
 
@@ -260,8 +268,7 @@ function SetDefault() {
       await deleteMessageFromDB(messageId);
       console.log(`✅ ลบข้อความสำเร็จ`);
       
-      // ลบข้อความออกจาก state
-      setMessages(prevMessages => prevMessages.filter(msg => msg.id !== messageId));
+      setMessageSequence(prevMessages => prevMessages.filter(msg => msg.originalData?.id !== messageId));
       
     } catch (err) {
       console.error("เกิดข้อผิดพลาดในการลบข้อความ:", err);
@@ -269,17 +276,20 @@ function SetDefault() {
     }
   };
 
-  // ✅ ฟังก์ชันนับจำนวนไฟล์สื่อทั้งหมด
-  const getTotalMediaCount = () => {
-    return mediaFiles.videos.length + mediaFiles.images1.length + mediaFiles.images2.length;
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'text': return '💬';
+      case 'image': return '🖼️';
+      case 'video': return '📹';
+      default: return '📄';
+    }
   };
 
-  // ✅ ข้อมูลสำหรับแสดงผล
   const selectedPageName = pages.find(page => page.id === selectedPage)?.name || "ไม่ได้เลือกเพจ";
 
   return (
+       // Sidebar
     <div className="app-container">
-      {/* Sidebar */}
       <aside className="sidebar">
         <h3 className="sidebar-title">ช่องทางเชื่อมต่อ</h3>
         <button onClick={connectFacebook} className="BT">
@@ -302,186 +312,156 @@ function SetDefault() {
         <a href="#" className="title" style={{ marginLeft: "66px" }}>Setting</a><br />
       </aside>
 
-      {/* Main Content */}
       <div className="message-settings-container">
-        <h1>ตั้งค่าชุดข้อความ Default</h1>
+        <h1 className="header">ตั้งค่าลำดับข้อความ Default</h1>
         
-        {/* ✅ แสดงข้อมูลเพจที่เลือก */}
         <div className="page-info">
           <p style={{textAlign:"center"}}><strong>เพจที่เลือก:</strong> {selectedPageName}</p>  
         </div>
 
-        {/* ✅ เพิ่มส่วนอัพโหลดสื่อ */}
-        <div className="media-upload-section">
-          
-          {/* กล่องข้อความ */}
-          <div className="message-box-section">
-            <div className="message-box-header">
-              <span className="message-icon">💬</span>
-              <span className="message-title">กล่องข้อความ </span>
-              {getTotalMediaCount() > 0 && (
-                <span className="media-count-badge">
-                  📎 {getTotalMediaCount()} ไฟล์
-                </span>
-              )}
+        <div className="sequence-container">
+          <div className="sequence-card">
+            <h3 className="sequence-header">✨ เพิ่มรายการใหม่</h3>
+
+            <div className="input-form">
+              <label className="input-label">ประเภท:</label>
+              <select
+                value={currentInput.type}
+                onChange={(e) => setCurrentInput(prev => ({
+                  ...prev,
+                  type: e.target.value,
+                  content: '',
+                  file: null,
+                  preview: null
+                }))}
+                className="input-select"
+              >
+                <option value="text">💬 ข้อความ</option>
+                <option value="image">🖼️ รูปภาพ</option>
+                <option value="video">📹 วิดีโอ</option>
+              </select>
             </div>
-              
-        {/* ✅ แสดงรายการข้อความที่บันทึกไว้ */}
-              
-              <div style={{ marginBottom: "20px" , marginLeft: "10px" , marginRight: "10px"}}>
-                 <div className="message-list">
-                      {loading ? (
-                        <p className="loading">🔄 กำลังโหลดข้อความ...</p>
-                      ) : messages.length > 0 ? (
-                        messages.map((msg, index) => (
-                          <div key={msg.id || index} className="message-item">
-                            <div className="message-content">
-                              <span className="message-text">{msg.message}</span>
-                              {msg.mediaCount && (
-                                <div className="message-media-info">
-                                  {msg.mediaCount.videos > 0 && (
-                                    <span className="media-badge video-badge">📹 {msg.mediaCount.videos}</span>
-                                  )}
-                                  {msg.mediaCount.images1 > 0 && (
-                                    <span className="media-badge image-badge">🖼️ {msg.mediaCount.images1}</span>
-                                  )}
-                                  {msg.mediaCount.images2 > 0 && (
-                                    <span className="media-badge image-badge">🖼️ {msg.mediaCount.images2}</span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => handleDeleteMessage(msg.id)}
-                              className="delete-button"
-                              disabled={!msg.id}
-                            >
-                              ลบ
-                            </button>
-                          </div>
-                        ))
-                      ) : selectedPage ? (
-                        <p className="no-messages">ยังไม่มีข้อความที่บันทึกไว้สำหรับเพจนี้</p>
-                      ) : (
-                        <p className="no-messages">กรุณาเลือกเพจเพื่อดูข้อความ</p>
-                      )}
+
+            {currentInput.type === 'text' ? (
+              <div className="input-form">
+                <label className="input-label">ข้อความ:</label>
+                <textarea
+                  value={currentInput.content}
+                  onChange={(e) => setCurrentInput(prev => ({ ...prev, content: e.target.value }))}
+                  placeholder="กรอกข้อความที่ต้องการส่ง..."
+                  className="input-textarea"
+                />
               </div>
-            </div>
-          </div>
+            ) : (
+              <div className="input-form">
+                <label className="input-label">เลือกไฟล์:</label>
+                <input
+                  type="file"
+                  accept={currentInput.type === 'image' ? 'image/*' : 'video/*'}
+                  onChange={handleFileUpload}
+                  className="input-file"
+                />
+                {currentInput.preview && (
+                  <div className="preview-container">
+                    {currentInput.type === 'image' ? (
+                      <img
+                        src={currentInput.preview}
+                        alt="Preview"
+                        className="preview-image"
+                      />
+                    ) : (
+                      <video
+                        src={currentInput.preview}
+                        controls
+                        className="preview-video"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* วิดีโอ */}
-          <div className="media-group">
-            <div className="media-header">
-              <span className="media-icon">📹</span>
-              <span className="media-title">วิดีโอ</span>
-              {mediaFiles.videos.length > 0 && (
-                <span className="file-count">({mediaFiles.videos.length} ไฟล์)</span>
-              )}
-            </div>
-            <div className="media-upload-area">
-              <input
-                type="file"
-                id="video-upload"
-                accept="video/*"
-                multiple
-                onChange={(e) => handleFileUpload(e, 'videos')}
-                style={{ display: 'none' }}
-              />
-              <label htmlFor="video-upload" className="upload-button">
-                <span className="upload-icon">⬆️</span>
-                <span>Drop files to attach, Browse Files</span>
-              </label>
-              {mediaFiles.videos.length > 0 && (
-                <div className="media-preview">
-                  {mediaFiles.videos.map((file, index) => (
-                    <div key={index} className="media-item">
-                      <video src={file.preview} controls className="media-thumbnail" />
-                      <div className="media-info">
-                        <span className="media-name">{file.name}</span>
-                        <span className="media-size">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
-                      </div>
-                      <button 
-                        onClick={() => removeMediaFile('videos', index)}
-                        className="remove-media-btn"
-                      >
-                        ❌
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* รูปที่ 1 */}
-          <div className="media-group">
-            <div className="media-header">
-              <span className="media-icon">🖼️</span>
-              <span className="media-title">รูปที่ 1</span>
-              {mediaFiles.images1.length > 0 && (
-                <span className="file-count">({mediaFiles.images1.length} ไฟล์)</span>
-              )}
-            </div>
-            <div className="media-upload-area">
-              <input
-                type="file"
-                id="image1-upload"
-                accept="image/*"
-                multiple
-                onChange={(e) => handleFileUpload(e, 'images1')}
-                style={{ display: 'none' }}
-              />
-              <label htmlFor="image1-upload" className="upload-button">
-                <span className="upload-icon">⬆️</span>
-                <span>Drop files to attach, Browse Files</span>
-              </label>
-              {mediaFiles.images1.length > 0 && (
-                <div className="media-preview">
-                  {mediaFiles.images1.map((file, index) => (
-                    <div key={index} className="media-item">
-                      <img src={file.preview} alt={file.name} className="media-thumbnail" />
-                      <div className="media-info">
-                        <span className="media-name">{file.name}</span>
-                        <span className="media-size">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
-                      </div>
-                      <button 
-                        onClick={() => removeMediaFile('images1', index)}
-                        className="remove-media-btn"
-                      >
-                        ❌
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* รูปที่ 2 */}
-         
-        </div>
-
-        {/* ✅ แสดงรายการข้อความที่บันทึกไว้ */}
-       
-
-        {/* ✅ ส่วนกรอกข้อความใหม่ */}
-        <div className="message-input-group">
-          <textarea
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder={selectedPage ? "เพิ่มข้อความใหม่..." : "กรุณาเลือกเพจก่อน"}
-            className="message-textarea"
-            disabled={!selectedPage}
-          />
-          <div className="message-controls">
-           
             <button
-              onClick={handleAddMessage}
-              className="add-button"
-              disabled={!selectedPage || !newMessage.trim()}
+              onClick={addToSequence}
+              disabled={!selectedPage}
+              className="add-btn"
             >
-              {getTotalMediaCount() > 0 ? "เพิ่มข้อความ" : "เพิ่มข้อความ"}
+              ➕ เพิ่มในลำดับ
             </button>
+          </div>
+
+          <div className="sequence-card">
+            <div className="sequence-header-container">
+              <h3 className="sequence-header">📋 ลำดับการส่ง ({messageSequence.length})</h3>
+              {messageSequence.filter(item => !item.originalData).length > 0 && (
+                <button
+                  onClick={saveMessageSequence}
+                  className="save-btn"
+                >
+                  💾 บันทึกทั้งหมด
+                </button>
+              )}
+            </div>
+
+            <div className="sequence-hint">
+              💡 ลากและวางเพื่อจัดลำดับใหม่
+            </div>
+
+            {loading ? (
+              <div className="loading-state">
+                🔄 กำลังโหลด...
+              </div>
+            ) : messageSequence.length === 0 ? (
+              <div className="empty-state">
+                {selectedPage ? 
+                  "ยังไม่มีรายการในลำดับ เพิ่มข้อความหรือสื่อเข้ามาได้เลย!" : 
+                  "กรุณาเลือกเพจเพื่อเริ่มต้น"
+                }
+              </div>
+            ) : (
+              <div className="sequence-list">
+                {messageSequence.map((item, index) => (
+                  <div
+                    key={item.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, index)}
+                    className={`sequence-item ${item.originalData ? 'sequence-item-saved' : ''}`}
+                  >
+                    <div className="sequence-order">
+                      {index + 1}
+                    </div>
+
+                    <div className="sequence-icon">
+                      {getTypeIcon(item.type)}
+                    </div>
+
+                    <div className="sequence-content">
+                      <div className="sequence-type">
+                        {item.type === 'text' ? 'ข้อความ' : item.type === 'image' ? 'รูปภาพ' : 'วิดีโอ'}
+                        {item.originalData && <span className="sequence-saved-label"> (บันทึกแล้ว)</span>}
+                      </div>
+                      <div className="sequence-text">
+                        {item.content}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => item.originalData ? 
+                        handleDeleteMessage(item.originalData.id) : 
+                        removeFromSequence(item.id)
+                      }
+                      className="sequence-delete-btn"
+                      title="ลบรายการนี้"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
