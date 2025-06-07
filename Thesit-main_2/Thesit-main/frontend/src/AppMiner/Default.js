@@ -299,7 +299,7 @@ function SetDefault() {
         </button>
         <hr />
         <select value={selectedPage} onChange={handlePageChange} className="select-page">
-          <option value="">-- เลือกเพจ --</option>
+          
           {pages.map((page) => (
             <option key={page.id} value={page.id}>
               {page.name}
@@ -392,7 +392,7 @@ function SetDefault() {
 
           <div className="sequence-card">
             <div className="sequence-header-container">
-              <h3 className="sequence-header">📋 ลำดับการส่ง ({messageSequence.length})</h3>
+              <h3 className="sequence-header">📋 ลำดับการส่ง </h3>
               {messageSequence.filter(item => !item.originalData).length > 0 && (
                 <button
                   onClick={saveMessageSequence}

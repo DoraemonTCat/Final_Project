@@ -158,6 +158,7 @@
   font-size: 12px;
 }
 
+
 /* Input Form Styles */
 .input-form {
   margin-bottom: 15px;
@@ -269,4 +270,8 @@
 
 .drag-over {
   background-color: #e1f5fe;
+}
+.sequence-hint{
+  margin-top: 10px;
+  margin-bottom: 10px;
 }

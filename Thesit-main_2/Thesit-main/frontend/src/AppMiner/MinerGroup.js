@@ -85,7 +85,7 @@ function SetMiner() {
         </button>
         <hr />
         <select value={selectedPage} onChange={handlePageChange} className="select-page">
-          <option value="">-- เลือกเพจ --</option>
+          
           {pages.map((page) => (
             <option key={page.id} value={page.id}>
               {page.name}

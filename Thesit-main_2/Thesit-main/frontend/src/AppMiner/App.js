@@ -303,7 +303,7 @@ function App() {
         <select
           value={selectedPage} onChange={handlePageChange} className="select-page"
         >
-          <option value="">-- เลือกเพจ --</option>
+          
           {pages.map((page) => (
             <option key={page.id} value={page.id}>
               {page.name}
@@ -427,7 +427,6 @@ function App() {
         {loading ? (
           <div style={{ textAlign: "center", padding: "40px" }}>
             <p style={{ fontSize: "18px" }}>⏳ กำลังโหลดข้อมูล...</p>
-            <p style={{ color: "#666" }}>กำลังใช้ Batch API เพื่อเร็วขึ้น</p>
           </div>
         ) : displayData.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px" }}>
